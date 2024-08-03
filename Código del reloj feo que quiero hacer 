@@ -1,0 +1,148 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <RTClib.h>
+#include <DHT.h>
+
+// Configuración del LCD
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// Configuración del RTC
+RTC_DS1307 rtc;
+
+// Configuración del DHT22
+#define DHTPIN 16
+#define DHTTYPE DHT22
+DHT dht(DHTPIN, DHTTYPE);
+
+// Configuración de los botones
+const int buttonA = 10;
+const int buttonB = 11;
+const int buttonC = 12;
+const int buttonD = 13;
+
+// Variables para el ajuste de la hora
+bool adjusting = false;
+int adjustIndex = 0;
+int hours, minutes, seconds;
+
+void setup() {
+  // Inicializar LCD
+    lcd.begin(16, 2);
+      lcd.backlight();
+
+        // Inicializar RTC
+          if (!rtc.begin()) {
+              lcd.print("Couldn't find RTC");
+                  while (1);
+                    }
+
+                      if (!rtc.isrunning()) {
+                          lcd.print("RTC is NOT running!");
+                            }
+
+                              // Inicializar DHT22
+                                dht.begin();
+
+                                  // Configurar botones
+                                    pinMode(buttonA, INPUT_PULLUP);
+                                      pinMode(buttonB, INPUT_PULLUP);
+                                        pinMode(buttonC, INPUT_PULLUP);
+                                          pinMode(buttonD, INPUT_PULLUP);
+                                          }
+
+                                          void loop() {
+                                            static bool showTemp = false;
+                                              static unsigned long lastButtonPress = 0;
+
+                                                // Leer botones
+                                                  bool buttonAState = digitalRead(buttonA) == LOW;
+                                                    bool buttonBState = digitalRead(buttonB) == LOW;
+                                                      bool buttonCState = digitalRead(buttonC) == LOW;
+                                                        bool buttonDState = digitalRead(buttonD) == LOW;
+
+                                                          // Evitar rebotamiento de los botones
+                                                            if (millis() - lastButtonPress > 200) {
+                                                                if (buttonBState) {
+                                                                      showTemp = !showTemp;
+                                                                            lastButtonPress = millis();
+                                                                                }
+
+                                                                                    if (buttonDState) {
+                                                                                          if (adjusting) {
+                                                                                                  // Guardar la hora ajustada
+                                                                                                          rtc.adjust(DateTime(2023, 1, 1, hours, minutes, seconds));
+                                                                                                                }
+                                                                                                                      adjusting = !adjusting;
+                                                                                                                            adjustIndex = 0;
+                                                                                                                                  lastButtonPress = millis();
+                                                                                                                                      }
+
+                                                                                                                                          if (adjusting) {
+                                                                                                                                                if (buttonAState) {
+                                                                                                                                                        adjustTime(1);
+                                                                                                                                                                lastButtonPress = millis();
+                                                                                                                                                                      }
+
+                                                                                                                                                                            if (buttonCState) {
+                                                                                                                                                                                    adjustTime(-1);
+                                                                                                                                                                                            lastButtonPress = millis();
+                                                                                                                                                                                                  }
+
+                                                                                                                                                                                                        if (buttonBState) {
+                                                                                                                                                                                                                adjustIndex = (adjustIndex + 1) % 2; // Ciclar entre horas y minutos
+                                                                                                                                                                                                                        lastButtonPress = millis();
+                                                                                                                                                                                                                              }
+                                                                                                                                                                                                                                  }
+                                                                                                                                                                                                                                    }
+
+                                                                                                                                                                                                                                      if (showTemp) {
+                                                                                                                                                                                                                                          // Mostrar temperatura y humedad
+                                                                                                                                                                                                                                              float temp = dht.readTemperature();
+                                                                                                                                                                                                                                                  float humidity = dht.readHumidity();
+                                                                                                                                                                                                                                                      lcd.setCursor(0, 0);
+                                                                                                                                                                                                                                                          lcd.print("Temp: ");
+                                                                                                                                                                                                                                                              lcd.print(temp);
+                                                                                                                                                                                                                                                                  lcd.print(" C");
+                                                                                                                                                                                                                                                                      lcd.setCursor(0, 1);
+                                                                                                                                                                                                                                                                          lcd.print("Humidity: ");
+                                                                                                                                                                                                                                                                              lcd.print(humidity);
+                                                                                                                                                                                                                                                                                  lcd.print(" %");
+                                                                                                                                                                                                                                                                                    } else {
+                                                                                                                                                                                                                                                                                        // Mostrar hora
+                                                                                                                                                                                                                                                                                            DateTime now = rtc.now();
+                                                                                                                                                                                                                                                                                                hours = now.hour();
+                                                                                                                                                                                                                                                                                                    minutes = now.minute();
+                                                                                                                                                                                                                                                                                                        seconds = now.second();
+
+                                                                                                                                                                                                                                                                                                            lcd.setCursor(0, 0);
+                                                                                                                                                                                                                                                                                                                lcd.print("Time: ");
+                                                                                                                                                                                                                                                                                                                    lcd.print(now.hour());
+                                                                                                                                                                                                                                                                                                                        lcd.print(":");
+                                                                                                                                                                                                                                                                                                                            lcd.print(now.minute());
+                                                                                                                                                                                                                                                                                                                                lcd.print(":");
+                                                                                                                                                                                                                                                                                                                                    lcd.print(now.second());
+
+                                                                                                                                                                                                                                                                                                                                        if (adjusting) {
+                                                                                                                                                                                                                                                                                                                                              lcd.setCursor(0, 1);
+                                                                                                                                                                                                                                                                                                                                                    lcd.print("Set ");
+                                                                                                                                                                                                                                                                                                                                                          if (adjustIndex == 0) {
+                                                                                                                                                                                                                                                                                                                                                                  lcd.print("Hour: ");
+                                                                                                                                                                                                                                                                                                                                                                          lcd.print(hours);
+                                                                                                                                                                                                                                                                                                                                                                                } else if (adjustIndex == 1) {
+                                                                                                                                                                                                                                                                                                                                                                                        lcd.print("Min: ");
+                                                                                                                                                                                                                                                                                                                                                                                                lcd.print(minutes);
+                                                                                                                                                                                                                                                                                                                                                                                                      }
+                                                                                                                                                                                                                                                                                                                                                                                                          } else {
+                                                                                                                                                                                                                                                                                                                                                                                                                lcd.setCursor(0, 1);
+                                                                                                                                                                                                                                                                                                                                                                                                                      lcd.print("Press D to Set");
+                                                                                                                                                                                                                                                                                                                                                                                                                          }
+                                                                                                                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                                                                                                                            }
+
+                                                                                                                                                                                                                                                                                                                                                                                                                            void adjustTime(int increment) {
+                                                                                                                                                                                                                                                                                                                                                                                                                              if (adjustIndex == 0) {
+                                                                                                                                                                                                                                                                                                                                                                                                                                  hours = (hours + increment + 24) % 24;
+                                                                                                                                                                                                                                                                                                                                                                                                                                    } else if (adjustIndex == 1) {
+                                                                                                                                                                                                                                                                                                                                                                                                                                        minutes = (minutes + increment + 60) % 60;
+                                                                                                                                                                                                                                                                                                                                                                                                                                          }
+                                                                                                                                                                                                                                                                                                                                                                                                                                          }
